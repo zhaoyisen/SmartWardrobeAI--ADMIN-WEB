@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { DictType, DictData, PageParams, PageResult, ApiResponse, DictDropdownOption } from '@/types'
+import type { DictType, DictData, PageParams, PageResult, ApiResponse, DictDropdownOption, DictDataImportResultVO } from '@/types'
 
 /**
  * 字典类型分页查询参数
@@ -150,5 +150,24 @@ export const dictDataApi = {
    */
   getListByTypeId: (dictTypeId: number) => {
     return request.get<ApiResponse<DictDropdownOption[]>>(`/api/admin/dict-data/list-by-type-id/${dictTypeId}`)
+  },
+
+  /**
+   * 导入字典数据
+   */
+  importData: (file: File, duplicateStrategy: string = 'skip') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('duplicateStrategy', duplicateStrategy)
+    return request.post<ApiResponse<DictDataImportResultVO>>('/api/admin/dict-data/import', formData)
+  },
+
+  /**
+   * 下载导入模板
+   */
+  downloadTemplate: () => {
+    return request.get('/api/admin/dict-data/template', {
+      responseType: 'blob'
+    })
   }
 }

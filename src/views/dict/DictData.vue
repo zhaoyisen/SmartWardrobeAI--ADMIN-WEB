@@ -6,6 +6,14 @@
           <span>字典数据管理</span>
           <div>
             <el-button
+              type="success"
+              @click="handleImport"
+              style="margin-right: 10px"
+            >
+              <el-icon><Upload /></el-icon>
+              导入数据
+            </el-button>
+            <el-button
               type="danger"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
@@ -184,15 +192,122 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 导入对话框 -->
+    <el-dialog v-model="importDialogVisible" title="导入字典数据" width="600px" @close="handleImportDialogClose">
+      <el-form label-width="120px" label-position="right">
+        <el-form-item label="上传文件">
+          <el-upload
+            ref="uploadRef"
+            drag
+            :auto-upload="false"
+            :limit="1"
+            :on-exceed="handleExceed"
+            :on-change="handleFileChange"
+            :file-list="fileList"
+            accept=".xlsx,.xls"
+          >
+            <el-icon class="el-icon--upload"><Upload /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 Excel 文件（.xlsx, .xls）
+                <el-link type="primary" :underline="false" @click.stop="handleDownloadTemplate" style="margin-left: 8px">
+                  <el-icon><Download /></el-icon>
+                  下载模板
+                </el-link>
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="重复策略">
+          <el-radio-group v-model="duplicateStrategy">
+            <el-radio label="skip">跳过重复（保留原有数据）</el-radio>
+            <el-radio label="update">更新重复（覆盖原有数据）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="importing" @click="handleImportSubmit">开始导入</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导入结果对话框 -->
+    <el-dialog v-model="resultDialogVisible" title="导入结果" width="900px">
+      <div class="import-result-summary">
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="总记录数">{{ importResult?.totalCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="成功数量">
+            <span style="color: #67c23a">{{ importResult?.successCount || 0 }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="失败数量">
+            <span style="color: #f56c6c">{{ importResult?.failCount || 0 }}</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+
+      <el-tabs v-model="resultTab" style="margin-top: 20px">
+        <el-tab-pane label="成功列表" name="success">
+          <el-table
+            :data="importResult?.successList || []"
+            border
+            stripe
+            max-height="400"
+            v-if="importResult?.successList && importResult.successList.length > 0"
+          >
+            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column prop="rowNum" label="行号" width="80" align="center" />
+            <el-table-column prop="dictType" label="字典类型编码" width="150" />
+            <el-table-column prop="dictLabel" label="字典标签" min-width="120" />
+            <el-table-column prop="dictValue" label="字典值" min-width="150" />
+            <el-table-column prop="operation" label="操作类型" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.operation === '新增' ? 'success' : 'warning'">
+                  {{ row.operation }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="暂无成功记录" />
+        </el-tab-pane>
+        <el-tab-pane label="失败列表" name="fail">
+          <el-table
+            :data="importResult?.failList || []"
+            border
+            stripe
+            max-height="400"
+            v-if="importResult?.failList && importResult.failList.length > 0"
+          >
+            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column prop="rowNum" label="行号" width="80" align="center" />
+            <el-table-column prop="dictType" label="字典类型编码" width="150" />
+            <el-table-column prop="dictLabel" label="字典标签" min-width="120" />
+            <el-table-column prop="dictValue" label="字典值" min-width="150" />
+            <el-table-column prop="errorMessage" label="失败原因" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span style="color: #f56c6c">{{ row.errorMessage }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else description="暂无失败记录" />
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <el-button type="primary" @click="resultDialogVisible = false">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search, Refresh, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadInstance, type UploadFile } from 'element-plus'
+import { Plus, Search, Refresh, Delete, Download, Upload } from '@element-plus/icons-vue'
 import { dictDataApi, dictTypeApi } from '@/api/dict'
-import type { DictData, DictType, PageParams } from '@/types'
+import type { DictData, DictType, PageParams, DictDataImportResultVO } from '@/types'
 
 const loading = ref(false)
 const tableData = ref<DictData[]>([])
@@ -201,6 +316,17 @@ const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
 const dictTypeList = ref<DictType[]>([])
 const selectedIds = ref<number[]>([])
+
+// 导入相关
+const importDialogVisible = ref(false)
+const resultDialogVisible = ref(false)
+const importing = ref(false)
+const uploadRef = ref<UploadInstance>()
+const fileList = ref<UploadFile[]>([])
+const selectedFile = ref<File | null>(null)
+const duplicateStrategy = ref('skip')
+const importResult = ref<DictDataImportResultVO | null>(null)
+const resultTab = ref('success')
 
 const pageParams = reactive<PageParams>({
   pageNum: 1,
@@ -401,6 +527,106 @@ const handleDialogClose = () => {
   formRef.value?.resetFields()
 }
 
+// 下载模板
+const handleDownloadTemplate = async () => {
+  try {
+    const response = await dictDataApi.downloadTemplate()
+    // 对于blob响应，response 是 AxiosResponse，response.data 是 Blob 对象
+    const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
+    
+    // 从响应头获取文件名，如果没有则使用默认文件名
+    const contentDisposition = response.headers?.['content-disposition'] || ''
+    let filename = '字典数据导入模板.xlsx'
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (filenameMatch && filenameMatch[1]) {
+        filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''))
+      }
+    }
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('模板下载成功')
+  } catch (error: any) {
+    console.error('下载模板失败:', error)
+    // 如果错误响应是blob（可能是错误信息），尝试读取
+    if (error.response && error.response.data instanceof Blob) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const errorText = JSON.parse(reader.result as string)
+          ElMessage.error(errorText.message || '下载失败')
+        } catch {
+          ElMessage.error('下载失败')
+        }
+      }
+      reader.readAsText(error.response.data)
+    } else {
+      ElMessage.error(error.message || '下载失败')
+    }
+  }
+}
+
+// 打开导入对话框
+const handleImport = () => {
+  importDialogVisible.value = true
+}
+
+// 文件选择变化
+const handleFileChange = (file: UploadFile) => {
+  selectedFile.value = file.raw || null
+}
+
+// 文件超出限制
+const handleExceed = () => {
+  ElMessage.warning('只能上传一个文件，请先删除已有文件')
+}
+
+// 导入对话框关闭
+const handleImportDialogClose = () => {
+  fileList.value = []
+  selectedFile.value = null
+  duplicateStrategy.value = 'skip'
+  uploadRef.value?.clearFiles()
+}
+
+// 提交导入
+const handleImportSubmit = async () => {
+  if (!selectedFile.value) {
+    ElMessage.warning('请选择要导入的文件')
+    return
+  }
+
+  importing.value = true
+  try {
+    const res = await dictDataApi.importData(selectedFile.value, duplicateStrategy.value)
+    if (res && res.data) {
+      importResult.value = res.data
+      importDialogVisible.value = false
+      resultDialogVisible.value = true
+      resultTab.value = res.data.failCount && res.data.failCount > 0 ? 'fail' : 'success'
+      
+      // 如果有成功导入的数据，刷新列表
+      if (res.data.successCount && res.data.successCount > 0) {
+        fetchData()
+      }
+      
+      ElMessage.success(`导入完成：成功 ${res.data.successCount || 0} 条，失败 ${res.data.failCount || 0} 条`)
+    }
+  } catch (error) {
+    console.error('导入失败:', error)
+  } finally {
+    importing.value = false
+  }
+}
+
 onMounted(async () => {
   await fetchDictTypeList()
   fetchData()
@@ -432,6 +658,10 @@ onMounted(async () => {
     color: #909399;
     margin-top: 4px;
     line-height: 1.5;
+  }
+
+  .import-result-summary {
+    margin-bottom: 20px;
   }
 }
 </style>

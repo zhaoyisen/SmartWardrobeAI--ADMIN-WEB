@@ -70,6 +70,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Storage',
         component: () => import('@/views/storage/MinioManage.vue'),
         meta: { title: '存储管理', icon: 'FolderOpened' }
+      },
+      {
+        path: 'category-strategy',
+        name: 'CategoryStrategy',
+        component: () => import('@/views/categoryStrategy/CategoryStrategyList.vue'),
+        meta: { title: '品类策略配置', icon: 'Grid' }
       }
     ]
   }

@@ -328,3 +328,81 @@ export interface DashboardVO {
   userActivity?: UserActivity // 用户活跃度
 }
 
+/**
+ * 【后台】字典数据导入结果
+ */
+export interface DictDataImportResultVO {
+  totalCount?: number // 总记录数
+  successCount?: number // 成功数量
+  failCount?: number // 失败数量
+  successList?: ImportSuccessItem[] // 成功记录列表
+  failList?: ImportFailItem[] // 失败记录列表
+}
+
+/**
+ * 导入成功项
+ */
+export interface ImportSuccessItem {
+  rowNum?: number // 行号
+  dictType?: string // 字典类型编码
+  dictLabel?: string // 字典标签
+  dictValue?: string // 字典值
+  operation?: string // 操作类型：新增/更新
+}
+
+/**
+ * 导入失败项
+ */
+export interface ImportFailItem {
+  rowNum?: number // 行号
+  dictType?: string // 字典类型编码
+  dictLabel?: string // 字典标签
+  dictValue?: string // 字典值
+  errorMessage?: string // 失败原因
+}
+
+/**
+ * 【后台】品类策略列表展示对象
+ */
+export interface CategoryStrategyVO {
+  id?: number // 主键ID
+  categoryCode?: string // 品类代码
+  categoryDesc?: string // 中文描述
+  region?: string // 部位字典值
+  regionLabel?: string // 部位字典标签（用于前端显示）
+  layer?: string // 层级字典值
+  layerLabel?: string // 层级字典标签（用于前端显示）
+  sort?: number // 排序
+  status?: number // 状态
+  remark?: string // 备注
+  createTime?: string // 创建时间
+  updateTime?: string // 更新时间
+}
+
+/**
+ * 【后台】品类策略分页查询参数
+ */
+export interface CategoryStrategyQueryDTO extends PageParams {
+  categoryCode?: string // 品类代码（模糊查询）
+  categoryDesc?: string // 中文描述（模糊查询）
+  region?: string // 部位字典值（精确查询）
+  layer?: string // 层级字典值（精确查询）
+  status?: number // 状态 (1启用 0禁用)
+  sortField?: string // 排序字段
+  isAsc?: boolean // 是否升序，默认false（倒序）
+}
+
+/**
+ * 【后台】品类策略 新增/修改 表单
+ */
+export interface CategoryStrategySaveDTO {
+  id?: number // ID (修改时必填，新增时忽略)
+  categoryCode: string // 品类代码（唯一，如 T-shirt）
+  categoryDesc: string // 中文描述（如 T恤）
+  region: string // 部位字典值（如 TOP）
+  layer: string // 层级字典值（如 MIDDLE）
+  sort?: number // 排序值
+  status?: number // 状态 (1启用 0禁用)
+  remark?: string // 备注说明
+}
+

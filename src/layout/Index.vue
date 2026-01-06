@@ -41,6 +41,10 @@
           <el-icon><FolderOpened /></el-icon>
           <span>存储管理</span>
         </el-menu-item>
+        <el-menu-item index="/category-strategy">
+          <el-icon><Grid /></el-icon>
+          <span>品类策略配置</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
