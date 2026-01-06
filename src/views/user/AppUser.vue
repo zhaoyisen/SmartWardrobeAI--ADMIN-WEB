@@ -12,24 +12,11 @@
         <el-form-item label="用户名">
           <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable />
         </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="searchForm.nickname" placeholder="请输入昵称" clearable />
+        <el-form-item label="邮箱">
+          <el-input v-model="searchForm.email" placeholder="请输入邮箱" clearable />
         </el-form-item>
         <el-form-item label="手机号">
           <el-input v-model="searchForm.phone" placeholder="请输入手机号" clearable />
-        </el-form-item>
-        <el-form-item label="注册来源">
-          <el-select
-            v-model="searchForm.registerSource"
-            placeholder="请选择注册来源"
-            clearable
-            style="width: 150px"
-          >
-            <el-option label="手机号" value="phone" />
-            <el-option label="微信" value="wechat" />
-            <el-option label="QQ" value="qq" />
-            <el-option label="其他" value="other" />
-          </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 120px">
@@ -50,21 +37,18 @@
       </el-form>
 
       <!-- 数据表格 -->
-      <el-table :data="tableData" v-loading="loading" border stripe>
+      <el-table 
+        :data="tableData" 
+        v-loading="loading" 
+        border 
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="username" label="用户名" min-width="120">
           <template #default="{ row }">
             <span>{{ row.username || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="nickname" label="昵称" min-width="120">
-          <template #default="{ row }">
-            <span>{{ row.nickname || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="phone" label="手机号" width="130">
-          <template #default="{ row }">
-            <span>{{ row.phone || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip>
@@ -72,26 +56,34 @@
             <span>{{ row.email || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="gender" label="性别" width="80" align="center">
+        <el-table-column prop="phone" label="手机号" width="130">
           <template #default="{ row }">
-            <el-tag v-if="row.gender === 1" type="primary">男</el-tag>
-            <el-tag v-else-if="row.gender === 2" type="danger">女</el-tag>
+            <span>{{ row.phone || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="avatarUrl" label="头像" width="100" align="center">
+          <template #default="{ row }">
+            <el-avatar v-if="row.avatarUrl" :src="row.avatarUrl" :size="40" />
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="registerSource" label="注册来源" width="100" align="center">
+        <el-table-column prop="height" label="身高(cm)" width="100" align="center">
           <template #default="{ row }">
-            <el-tag size="small">{{ getRegisterSourceLabel(row.registerSource) }}</el-tag>
+            <span>{{ row.height || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="weight" label="体重(kg)" width="100" align="center">
+          <template #default="{ row }">
+            <span>{{ row.weight || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '启用' : '封禁' }}
+              {{ row.status === 1 ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="lastLoginTime" label="最后登录" width="180" />
         <el-table-column prop="createTime" label="注册时间" width="180" />
         <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
@@ -102,17 +94,22 @@
               size="small"
               @click="handleToggleStatus(row)"
             >
-              {{ row.status === 1 ? '封禁' : '解封' }}
+              {{ row.status === 1 ? '禁用' : '启用' }}
             </el-button>
             <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
+      <!-- 批量操作栏 -->
+      <div v-if="selectedRows.length > 0" class="batch-actions">
+        <el-button type="danger" @click="handleBatchDelete">批量删除 ({{ selectedRows.length }})</el-button>
+      </div>
+
       <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
-          v-model:current-page="pageParams.page"
+          v-model:current-page="pageParams.pageNum"
           v-model:page-size="pageParams.pageSize"
           :total="total"
           :page-sizes="[10, 20, 50, 100]"
@@ -140,35 +137,37 @@
         <el-form-item label="用户名">
           <el-input v-model="formData.username" placeholder="用户名（可选）" disabled />
         </el-form-item>
-        <el-form-item label="昵称" prop="nickname">
-          <el-input v-model="formData.nickname" placeholder="请输入昵称" />
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="formData.email" placeholder="请输入邮箱" />
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="formData.phone" placeholder="请输入手机号" />
         </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="formData.email" placeholder="请输入邮箱" />
+        <el-form-item label="头像URL" prop="avatarUrl">
+          <el-input v-model="formData.avatarUrl" placeholder="请输入头像URL" />
         </el-form-item>
-        <el-form-item label="性别" prop="gender">
-          <el-radio-group v-model="formData.gender">
-            <el-radio :label="0">未知</el-radio>
-            <el-radio :label="1">男</el-radio>
-            <el-radio :label="2">女</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="生日" prop="birthday">
-          <el-date-picker
-            v-model="formData.birthday"
-            type="date"
-            placeholder="请选择生日"
+        <el-form-item label="身高(cm)" prop="height">
+          <el-input-number
+            v-model="formData.height"
+            :min="0"
+            :max="300"
+            placeholder="请输入身高"
             style="width: 100%"
-            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="体重(kg)" prop="weight">
+          <el-input-number
+            v-model="formData.weight"
+            :min="0"
+            :max="500"
+            placeholder="请输入体重"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
             <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">封禁</el-radio>
+            <el-radio :label="0">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -183,6 +182,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Search, Refresh } from '@element-plus/icons-vue'
 import { appUserApi } from '@/api/user'
 import type { AppUser, PageParams } from '@/types'
 
@@ -191,26 +191,27 @@ const tableData = ref<AppUser[]>([])
 const total = ref(0)
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
+const selectedRows = ref<AppUser[]>([])
 
 const pageParams = reactive<PageParams>({
-  page: 1,
+  pageNum: 1,
   pageSize: 10
 })
 
 const searchForm = reactive({
   username: '',
-  nickname: '',
+  email: '',
   phone: '',
-  status: undefined as number | undefined,
-  registerSource: ''
+  status: undefined as number | undefined
 })
 
 const formData = reactive<AppUser>({
-  nickname: '',
-  phone: '',
+  username: '',
   email: '',
-  gender: 0,
-  birthday: '',
+  phone: '',
+  avatarUrl: '',
+  height: undefined,
+  weight: undefined,
   status: 1
 })
 
@@ -218,18 +219,13 @@ const formRules: FormRules = {
   email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  height: [
+    { type: 'number', min: 0, max: 300, message: '身高应在0-300cm之间', trigger: 'blur' }
+  ],
+  weight: [
+    { type: 'number', min: 0, max: 500, message: '体重应在0-500kg之间', trigger: 'blur' }
   ]
-}
-
-// 获取注册来源标签
-const getRegisterSourceLabel = (source?: string) => {
-  const map: Record<string, string> = {
-    phone: '手机号',
-    wechat: '微信',
-    qq: 'QQ',
-    other: '其他'
-  }
-  return source ? map[source] || source : '-'
 }
 
 // 获取列表数据
@@ -242,10 +238,9 @@ const fetchData = async () => {
     }
     const res = await appUserApi.getList(params)
     if (res && res.data) {
-      // 兼容两种数据结构：res.data.list 或 res.data.data.list
-      const data = res.data.data || res.data
-      tableData.value = data.list || []
-      total.value = data.total || 0
+      const pageData = res.data as any
+      tableData.value = pageData.records || []
+      total.value = pageData.total || 0
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -256,17 +251,16 @@ const fetchData = async () => {
 
 // 搜索
 const handleSearch = () => {
-  pageParams.page = 1
+  pageParams.pageNum = 1
   fetchData()
 }
 
 // 重置
 const handleReset = () => {
   searchForm.username = ''
-  searchForm.nickname = ''
+  searchForm.email = ''
   searchForm.phone = ''
   searchForm.status = undefined
-  searchForm.registerSource = ''
   handleSearch()
 }
 
@@ -284,7 +278,7 @@ const handleEdit = async (row: AppUser) => {
   try {
     const res = await appUserApi.getDetail(row.id!)
     if (res && res.data) {
-      Object.assign(formData, res.data?.data || res.data || {})
+      Object.assign(formData, res.data)
       dialogVisible.value = true
     }
   } catch (error) {
@@ -292,10 +286,10 @@ const handleEdit = async (row: AppUser) => {
   }
 }
 
-// 切换状态（封禁/解封）
+// 切换状态（启用/禁用）
 const handleToggleStatus = async (row: AppUser) => {
   try {
-    const action = row.status === 1 ? '封禁' : '解封'
+    const action = row.status === 1 ? '禁用' : '启用'
     await ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', {
       type: 'warning'
     })
@@ -326,6 +320,33 @@ const handleDelete = async (row: AppUser) => {
   }
 }
 
+// 选择变化
+const handleSelectionChange = (selection: AppUser[]) => {
+  selectedRows.value = selection
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请选择要删除的用户')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 个用户吗？`, '提示', {
+      type: 'warning'
+    })
+    const ids = selectedRows.value.map(row => row.id!).filter(id => id !== undefined)
+    await appUserApi.batchDelete(ids)
+    ElMessage.success('批量删除成功')
+    selectedRows.value = []
+    fetchData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+    }
+  }
+}
+
 // 提交表单
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -333,7 +354,7 @@ const handleSubmit = async () => {
   await formRef.value.validate(async (valid: boolean) => {
     if (valid && formData.id) {
       try {
-        await appUserApi.update(formData.id, formData)
+        await appUserApi.update(formData)
         ElMessage.success('更新成功')
         dialogVisible.value = false
         fetchData()
@@ -372,6 +393,11 @@ onMounted(() => {
     display: flex;
     justify-content: flex-end;
     margin-top: 20px;
+  }
+
+  .batch-actions {
+    margin-top: 20px;
+    padding: 10px 0;
   }
 }
 </style>

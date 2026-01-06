@@ -54,7 +54,14 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
-              <el-icon><User /></el-icon>
+              <el-avatar 
+                :src="avatarUrl" 
+                :size="32" 
+                class="user-avatar"
+                fit="cover"
+              >
+                <el-icon><User /></el-icon>
+              </el-avatar>
               <span>{{ userInfo?.nickname || userInfo?.username || '管理员' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
@@ -75,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { tokenUtils } from '@/utils/request'
@@ -92,9 +99,34 @@ const currentTitle = computed(() => {
 // 用户信息
 const userInfo = ref<any>(null)
 
+// 计算头像URL，确保有效
+const avatarUrl = computed(() => {
+  if (!userInfo.value) return undefined
+  const avatar = userInfo.value.avatar
+  if (avatar && typeof avatar === 'string' && avatar.trim()) {
+    return avatar.trim()
+  }
+  return undefined
+})
+
 // 获取用户信息
+const loadUserInfo = () => {
+  const info = tokenUtils.getUserInfo()
+  if (info) {
+    userInfo.value = info
+  }
+}
+
 onMounted(() => {
-  userInfo.value = tokenUtils.getUserInfo()
+  loadUserInfo()
+  
+  // 监听自定义事件，当用户信息更新时自动刷新
+  window.addEventListener('userInfoUpdated', loadUserInfo)
+})
+
+// 组件卸载时移除事件监听
+onUnmounted(() => {
+  window.removeEventListener('userInfoUpdated', loadUserInfo)
 })
 
 // 退出登录
@@ -171,6 +203,10 @@ const handleLogout = async () => {
       gap: 8px;
       cursor: pointer;
       color: #606266;
+
+      .user-avatar {
+        flex-shrink: 0;
+      }
 
       &:hover {
         color: #409eff;

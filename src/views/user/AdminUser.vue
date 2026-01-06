@@ -38,12 +38,17 @@
       </el-form>
 
       <!-- 数据表格 -->
-      <el-table :data="tableData" v-loading="loading" border stripe>
+      <el-table 
+        :data="tableData" 
+        v-loading="loading" 
+        border 
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="username" label="用户名" min-width="120" />
         <el-table-column prop="nickname" label="昵称" min-width="120" />
-        <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="phone" label="手机号" width="130" />
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -69,10 +74,15 @@
         </el-table-column>
       </el-table>
 
+      <!-- 批量操作栏 -->
+      <div v-if="selectedRows.length > 0" class="batch-actions">
+        <el-button type="danger" @click="handleBatchDelete">批量删除 ({{ selectedRows.length }})</el-button>
+      </div>
+
       <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
-          v-model:current-page="pageParams.page"
+          v-model:current-page="pageParams.pageNum"
           v-model:page-size="pageParams.pageSize"
           :total="total"
           :page-sizes="[10, 20, 50, 100]"
@@ -115,25 +125,38 @@
         <el-form-item label="昵称" prop="nickname">
           <el-input v-model="formData.nickname" placeholder="请输入昵称" />
         </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="formData.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="formData.phone" placeholder="请输入手机号" />
+        <el-form-item label="头像" prop="avatar">
+          <div class="avatar-upload-container">
+            <!-- 编辑时显示当前头像 -->
+            <div v-if="formData.id && formData.avatar" class="avatar-preview">
+              <el-avatar :src="formData.avatar" :size="80" />
+              <div class="avatar-tip">当前头像</div>
+            </div>
+            <!-- 上传组件 -->
+            <el-upload
+              class="avatar-uploader"
+              :show-file-list="false"
+              :before-upload="handleUpload"
+              accept="image/*"
+              :disabled="uploading"
+            >
+              <el-avatar v-if="formData.avatar" :src="formData.avatar" :size="80" />
+              <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+              <template #tip>
+                <div class="el-upload__tip">
+                  {{ formData.id ? '点击重新上传头像' : '点击上传头像' }}
+                  <br />
+                  支持 jpg/png/gif 格式，文件大小不超过 5MB
+                </div>
+              </template>
+            </el-upload>
+          </div>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
             <el-radio :label="1">启用</el-radio>
             <el-radio :label="0">禁用</el-radio>
           </el-radio-group>
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input
-            v-model="formData.remark"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入备注"
-          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -142,57 +165,27 @@
       </template>
     </el-dialog>
 
-    <!-- 重置密码对话框 -->
-    <el-dialog v-model="passwordDialogVisible" title="重置密码" width="500px">
-      <el-form
-        :model="passwordForm"
-        :rules="passwordRules"
-        ref="passwordFormRef"
-        label-width="100px"
-        label-position="right"
-      >
-        <el-form-item label="新密码" prop="password">
-          <el-input
-            v-model="passwordForm.password"
-            type="password"
-            placeholder="请输入新密码"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input
-            v-model="passwordForm.confirmPassword"
-            type="password"
-            placeholder="请再次输入新密码"
-            show-password
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="passwordDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handlePasswordSubmit">确定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadProps } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import { adminUserApi } from '@/api/user'
+import { storageApi } from '@/api/storage'
+import { tokenUtils } from '@/utils/request'
 import type { AdminUser, PageParams } from '@/types'
 
 const loading = ref(false)
 const tableData = ref<AdminUser[]>([])
 const total = ref(0)
 const dialogVisible = ref(false)
-const passwordDialogVisible = ref(false)
 const formRef = ref<FormInstance>()
-const passwordFormRef = ref<FormInstance>()
-const currentUserId = ref<number>()
+const selectedRows = ref<AdminUser[]>([])
 
 const pageParams = reactive<PageParams>({
-  page: 1,
+  pageNum: 1,
   pageSize: 10
 })
 
@@ -206,15 +199,8 @@ const formData = reactive<AdminUser>({
   username: '',
   password: '',
   nickname: '',
-  email: '',
-  phone: '',
-  status: 1,
-  remark: ''
-})
-
-const passwordForm = reactive({
-  password: '',
-  confirmPassword: ''
+  avatar: '',
+  status: 1
 })
 
 const formRules: FormRules = {
@@ -222,33 +208,55 @@ const formRules: FormRules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
-  ],
-  email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }],
-  phone: [
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
-  ]
-}
-
-const validateConfirmPassword = (rule: any, value: any, callback: any) => {
-  if (value !== passwordForm.password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
-const passwordRules: FormRules = {
-  password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' }
   ]
 }
 
 const dialogTitle = computed(() => (formData.id ? '编辑管理端用户' : '新增管理端用户'))
+
+// 上传相关
+const uploading = ref(false)
+
+// 自定义上传处理
+const handleUpload: UploadProps['beforeUpload'] = async (file) => {
+  // 验证文件类型
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+
+  // 验证文件大小
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isLt5M) {
+    ElMessage.error('图片大小不能超过 5MB!')
+    return false
+  }
+
+  // 开始上传
+  uploading.value = true
+  try {
+    const res = await storageApi.uploadFile(file)
+    if (res && res.data) {
+      const fileData = res.data as any
+      if (fileData.fileUrl) {
+        formData.avatar = fileData.fileUrl
+        ElMessage.success('头像上传成功')
+      } else {
+        ElMessage.error('上传失败，未获取到文件URL')
+      }
+    } else {
+      ElMessage.error('上传失败')
+    }
+  } catch (error) {
+    console.error('上传失败:', error)
+    ElMessage.error('头像上传失败')
+  } finally {
+    uploading.value = false
+  }
+
+  // 返回 false 阻止默认上传行为（因为我们使用自定义上传）
+  return false
+}
 
 // 获取列表数据
 const fetchData = async () => {
@@ -260,10 +268,9 @@ const fetchData = async () => {
     }
     const res = await adminUserApi.getList(params)
     if (res && res.data) {
-      // 兼容两种数据结构：res.data.list 或 res.data.data.list
-      const data = res.data.data || res.data
-      tableData.value = data.list || []
-      total.value = data.total || 0
+      const pageData = res.data as any
+      tableData.value = pageData.records || []
+      total.value = pageData.total || 0
     }
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -274,7 +281,7 @@ const fetchData = async () => {
 
 // 搜索
 const handleSearch = () => {
-  pageParams.page = 1
+  pageParams.pageNum = 1
   fetchData()
 }
 
@@ -298,13 +305,12 @@ const handlePageChange = () => {
 // 新增
 const handleAdd = () => {
   Object.assign(formData, {
+    id: undefined,
     username: '',
     password: '',
     nickname: '',
-    email: '',
-    phone: '',
-    status: 1,
-    remark: ''
+    avatar: '',
+    status: 1
   })
   dialogVisible.value = true
 }
@@ -315,7 +321,7 @@ const handleEdit = async (row: AdminUser) => {
     const res = await adminUserApi.getDetail(row.id!)
     if (res && res.data) {
       Object.assign(formData, {
-        ...(res.data?.data || res.data || {}),
+        ...res.data,
         password: '' // 编辑时不显示密码
       })
       dialogVisible.value = true
@@ -337,29 +343,19 @@ const handleToggleStatus = async (row: AdminUser) => {
   }
 }
 
-// 重置密码
-const handleResetPassword = (row: AdminUser) => {
-  currentUserId.value = row.id!
-  passwordForm.password = ''
-  passwordForm.confirmPassword = ''
-  passwordDialogVisible.value = true
-}
-
-// 提交密码重置
-const handlePasswordSubmit = async () => {
-  if (!passwordFormRef.value) return
-
-  await passwordFormRef.value.validate(async (valid: boolean) => {
-    if (valid && currentUserId.value) {
-      try {
-        await adminUserApi.resetPassword(currentUserId.value, passwordForm.password)
-        ElMessage.success('密码重置成功')
-        passwordDialogVisible.value = false
-      } catch (error) {
-        console.error('重置密码失败:', error)
-      }
+// 重置密码（重置为默认密码123456）
+const handleResetPassword = async (row: AdminUser) => {
+  try {
+    await ElMessageBox.confirm('确定要将该用户的密码重置为默认密码（123456）吗？', '提示', {
+      type: 'warning'
+    })
+    await adminUserApi.resetPassword(row.id!)
+    ElMessage.success('密码已重置为：123456')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('重置密码失败:', error)
     }
-  })
+  }
 }
 
 // 删除
@@ -378,6 +374,33 @@ const handleDelete = async (row: AdminUser) => {
   }
 }
 
+// 选择变化
+const handleSelectionChange = (selection: AdminUser[]) => {
+  selectedRows.value = selection
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请选择要删除的用户')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 个用户吗？`, '提示', {
+      type: 'warning'
+    })
+    const ids = selectedRows.value.map(row => row.id!).filter(id => id !== undefined)
+    await adminUserApi.batchDelete(ids)
+    ElMessage.success('批量删除成功')
+    selectedRows.value = []
+    fetchData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+    }
+  }
+}
+
 // 提交表单
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -392,8 +415,30 @@ const handleSubmit = async () => {
         }
 
         if (formData.id) {
-          await adminUserApi.update(formData.id, submitData)
+          await adminUserApi.update(submitData)
           ElMessage.success('更新成功')
+          
+          // 如果编辑的是当前登录用户，刷新用户信息
+          const currentUser = tokenUtils.getUserInfo()
+          if (currentUser && currentUser.id === formData.id) {
+            try {
+              const res = await adminUserApi.getDetail(formData.id)
+              if (res && res.data) {
+                const userData = res.data as any
+                // 更新 localStorage 中的用户信息
+                tokenUtils.setUserInfo({
+                  id: userData.id,
+                  username: userData.username,
+                  nickname: userData.nickname,
+                  avatar: userData.avatar
+                })
+                // 触发自定义事件，通知布局组件刷新用户信息
+                window.dispatchEvent(new CustomEvent('userInfoUpdated'))
+              }
+            } catch (error) {
+              console.error('刷新用户信息失败:', error)
+            }
+          }
         } else {
           await adminUserApi.create(submitData)
           ElMessage.success('新增成功')
@@ -435,6 +480,61 @@ onMounted(() => {
     display: flex;
     justify-content: flex-end;
     margin-top: 20px;
+  }
+
+  .batch-actions {
+    margin-top: 20px;
+    padding: 10px 0;
+  }
+
+  .avatar-upload-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+
+    .avatar-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+
+      .avatar-tip {
+        font-size: 12px;
+        color: #909399;
+      }
+    }
+
+    .avatar-uploader {
+      :deep(.el-upload) {
+        border: 1px dashed #d9d9d9;
+        border-radius: 6px;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+          border-color: #409eff;
+        }
+      }
+
+      .avatar-uploader-icon {
+        font-size: 28px;
+        color: #8c939d;
+      }
+
+      .el-upload__tip {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #909399;
+        line-height: 1.5;
+      }
+    }
   }
 }
 </style>

@@ -78,37 +78,31 @@ export interface PageResult<T> {
 }
 
 /**
- * 管理端用户
+ * 管理端用户（sys_user表）
  */
 export interface AdminUser {
   id?: number
-  username: string // 用户名
-  password?: string // 密码（新增/编辑时使用）
+  username: string // 用户名（唯一）
+  password?: string // 密码（新增/编辑时使用，BCrypt加密）
   nickname?: string // 昵称
-  email?: string // 邮箱
-  phone?: string // 手机号
-  avatar?: string // 头像
+  avatar?: string // 头像URL
   status: number // 状态 0-禁用 1-启用
-  remark?: string // 备注
   createTime?: string
   updateTime?: string
 }
 
 /**
- * App端用户
+ * App端用户（users表）
  */
 export interface AppUser {
   id?: number
-  username?: string // 用户名（可能为空，使用手机号或第三方登录）
-  nickname?: string // 昵称
-  avatar?: string // 头像
-  phone?: string // 手机号
-  email?: string // 邮箱
-  gender?: number // 性别 0-未知 1-男 2-女
-  birthday?: string // 生日
+  username?: string // 昵称
+  email?: string // 邮箱（唯一，登录凭证）
+  phone?: string // 手机号（唯一，登录凭证）
+  avatarUrl?: string // 头像URL（后端字段：avatar_url）
+  height?: number // 身高（cm）
+  weight?: number // 体重（kg）
   status: number // 状态 0-禁用 1-启用
-  registerSource?: string // 注册来源（手机号/微信/QQ等）
-  lastLoginTime?: string // 最后登录时间
   createTime?: string
   updateTime?: string
 }
@@ -235,5 +229,102 @@ export interface AdminLoginVO {
   username: string
   nickname?: string
   avatar?: string
+}
+
+/**
+ * 趋势数据VO
+ */
+export interface TrendDataVO {
+  date?: string // 日期（LocalDate）
+  dateStr?: string // 日期字符串（用于前端展示）
+  clothingCount?: number // 新增衣物数
+  userCount?: number // 新增用户数
+  fileCount?: number // 新增文件数
+}
+
+/**
+ * 分类统计VO
+ */
+export interface CategoryStatsVO {
+  name?: string // 分类名称
+  value?: string // 分类值
+  count?: number // 数量
+  percentage?: number // 占比（百分比）
+}
+
+/**
+ * 最近衣物VO
+ */
+export interface RecentClothingVO {
+  id?: number // 衣物ID
+  name?: string // 衣物名称
+  region?: string // 部位
+  category?: string // 品类
+  userId?: number // 用户ID
+  username?: string // 用户名
+  createTime?: string // 创建时间（LocalDateTime）
+}
+
+/**
+ * 最近用户VO
+ */
+export interface RecentUserVO {
+  id?: number // 用户ID
+  username?: string // 用户名
+  email?: string // 邮箱
+  phone?: string // 手机号
+  createTime?: string // 注册时间（LocalDateTime）
+}
+
+/**
+ * 基础统计
+ */
+export interface BasicStatistics {
+  dictTypeCount?: number // 字典类型数
+  dictDataCount?: number // 字典数据数
+  aiModelCount?: number // AI模型数
+  totalUserCount?: number // 用户总数（管理端+App端）
+  sysUserCount?: number // 管理端用户数
+  appUserCount?: number // App端用户数
+  clothingCount?: number // 衣物总数
+  fileCount?: number // 文件总数
+}
+
+/**
+ * 分类统计
+ */
+export interface CategoryStatistics {
+  regionStats?: CategoryStatsVO[] // 按部位统计
+  categoryStats?: CategoryStatsVO[] // 按品类统计
+  seasonStats?: CategoryStatsVO[] // 按季节统计
+}
+
+/**
+ * 最近操作记录
+ */
+export interface RecentActivities {
+  recentClothing?: RecentClothingVO[] // 最近新增的衣物（最多10条）
+  recentUsers?: RecentUserVO[] // 最近注册的用户（最多10条）
+}
+
+/**
+ * 用户活跃度
+ */
+export interface UserActivity {
+  dailyActiveUsers?: number // 日活（当天有操作的用户数）
+  monthlyActiveUsers?: number // 月活（最近30天有操作的用户数）
+}
+
+/**
+ * 仪表盘统计数据VO
+ */
+export interface DashboardVO {
+  basicStatistics?: BasicStatistics // 基础统计
+  trendData7Days?: TrendDataVO[] // 数据趋势（最近7天）
+  trendData30Days?: TrendDataVO[] // 数据趋势（最近30天）
+  categoryStatistics?: CategoryStatistics // 衣物分类统计
+  recentActivities?: RecentActivities // 最近操作记录
+  storageInfo?: StorageStatisticsVO // 存储信息
+  userActivity?: UserActivity // 用户活跃度
 }
 

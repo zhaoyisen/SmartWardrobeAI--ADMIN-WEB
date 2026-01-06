@@ -63,6 +63,17 @@ export const storageApi = {
   getPreviewUrl: (id: number, expiresIn?: number) => {
     const params = expiresIn ? { expiresIn } : undefined
     return request.get<ApiResponse<FilePreviewVO>>(`/api/admin/storage/files/${id}/preview`, { params })
+  },
+
+  /**
+   * 上传文件
+   */
+  uploadFile: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    // 不设置 Content-Type，让浏览器自动设置（包含 boundary）
+    // 请求拦截器会处理 FormData 的情况
+    return request.post<ApiResponse<StorageFileVO>>('/api/admin/storage/files/upload', formData)
   }
 }
 
