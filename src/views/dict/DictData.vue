@@ -14,6 +14,15 @@
               导入数据
             </el-button>
             <el-button
+              type="success"
+              @click="handleRefreshCache"
+              :loading="cacheRefreshing"
+              style="margin-right: 10px"
+            >
+              <el-icon><Refresh /></el-icon>
+              刷新缓存
+            </el-button>
+            <el-button
               type="danger"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
@@ -316,6 +325,7 @@ const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
 const dictTypeList = ref<DictType[]>([])
 const selectedIds = ref<number[]>([])
+const cacheRefreshing = ref(false)
 
 // 导入相关
 const importDialogVisible = ref(false)
@@ -496,6 +506,19 @@ const handleBatchDelete = async () => {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
     }
+  }
+}
+
+// 刷新缓存
+const handleRefreshCache = async () => {
+  try {
+    cacheRefreshing.value = true
+    await dictDataApi.refreshCache()
+    ElMessage.success('缓存刷新成功')
+  } catch (error) {
+    console.error('刷新缓存失败:', error)
+  } finally {
+    cacheRefreshing.value = false
   }
 }
 

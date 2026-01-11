@@ -169,5 +169,12 @@ export const dictDataApi = {
     return request.get('/api/admin/dict-data/template', {
       responseType: 'blob'
     })
+  },
+
+  /**
+   * 刷新字典数据缓存
+   */
+  refreshCache: () => {
+    return request.post<ApiResponse<void>>('/api/admin/dict-data/refresh-cache')
   }
 }

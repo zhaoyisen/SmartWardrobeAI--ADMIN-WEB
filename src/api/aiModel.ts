@@ -38,6 +38,11 @@ export const aiModelApi = {
   // 批量删除
   batchDelete: (ids: number[]) => {
     return request.delete<ApiResponse<void>>('/api/admin/ai-model/batch', { data: ids })
+  },
+
+  // 刷新AI模型缓存
+  refreshCache: () => {
+    return request.post<ApiResponse<void>>('/api/admin/ai-model/refresh-cache')
   }
 }
 

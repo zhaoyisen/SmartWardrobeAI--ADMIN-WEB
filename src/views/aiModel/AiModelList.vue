@@ -4,10 +4,21 @@
       <template #header>
         <div class="card-header">
           <span>AI模型配置</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            新增模型
-          </el-button>
+          <div>
+            <el-button
+              type="success"
+              @click="handleRefreshCache"
+              :loading="cacheRefreshing"
+              style="margin-right: 10px"
+            >
+              <el-icon><Refresh /></el-icon>
+              刷新缓存
+            </el-button>
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              新增模型
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -335,7 +346,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { View, Hide, DocumentCopy } from '@element-plus/icons-vue'
+import { View, Hide, DocumentCopy, Refresh } from '@element-plus/icons-vue'
 import { aiModelApi } from '@/api/aiModel'
 import type { AiModel, PageParams } from '@/types'
 
@@ -350,6 +361,7 @@ const visibleApiKeys = ref<Record<number, boolean>>({}) // 列表中每行API Ke
 const detailDialogVisible = ref(false) // 详情查看对话框
 const currentDetailData = ref<AiModel | null>(null) // 当前查看的详情数据
 const showDetailApiKey = ref(false) // 详情对话框中API Key是否显示
+const cacheRefreshing = ref(false)
 
 const pageParams = reactive<PageParams>({
   pageNum: 1,
@@ -574,6 +586,19 @@ const handleDelete = async (row: AiModel) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
+  }
+}
+
+// 刷新缓存
+const handleRefreshCache = async () => {
+  try {
+    cacheRefreshing.value = true
+    await aiModelApi.refreshCache()
+    ElMessage.success('缓存刷新成功')
+  } catch (error) {
+    console.error('刷新缓存失败:', error)
+  } finally {
+    cacheRefreshing.value = false
   }
 }
 
